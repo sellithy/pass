@@ -8,3 +8,4 @@ val String.asProperties: GoodProperties
     get() = GoodProperties().apply {
         load(Main::class.java.getResource(this@asProperties)!!.openStream())
     }
+
