@@ -1,13 +1,13 @@
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
+import com.github.ajalt.clikt.parameters.options.eagerOption
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.json.encodeToStream
 import java.io.File
 import java.util.*
 
@@ -26,10 +26,16 @@ class Main : CliktCommand() {
     private val passwordsFilePath: File by option(envvar = "PASS_FILE_PATH", help = helpTexts["passwordsFilePath"])
         .file().required()
 
-    private val accountName: String by argument(help = helpTexts["accountName"])
+    private val accountName: String? by argument(help = helpTexts["accountName"])
+        .optional()
+
+    init {
+        eagerOption("--random", "-r", help = helpTexts["random"] ) {
+
+        }
+    }
 
     override fun run() {
-//        TreeMap(String.CASE_INSENSITIVE_ORDER)
         val accounts = TreeMap<String, AccountInfo>(String.CASE_INSENSITIVE_ORDER).apply {
             putAll(prettyJson.decodeFromStream<accountsFile>(accountsFilePath.inputStream()))
         }
@@ -39,7 +45,7 @@ class Main : CliktCommand() {
     }
 }
 
-fun String.toClipboard() {
+private fun String.toClipboard() {
     trim().replace("'", "'\"'\"'").let {
         ProcessBuilder.startPipeline(
             listOf(
@@ -50,9 +56,14 @@ fun String.toClipboard() {
     }
 }
 
+fun generateRandomPassword(): String =
+    arrayOf('a')
+        .toString()
+
 fun main(args: Array<String>) {
+    println(charArrayOf('a','b').concatToString())
 //    val args = arrayOf("paypal")
-    val argsParsed = Main().apply { main(args) }
+//    val argsParsed = Main().apply { main(args) }
 //    val acc = Account("PayPal", "shehab.ellithy@gmail.com", "Random1")
 //    println(Json.decodeFromString<Account>("\"C&C: sellithy Random24\""))
 }
