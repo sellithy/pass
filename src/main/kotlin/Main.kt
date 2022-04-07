@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import java.io.File
 import java.util.*
+import kotlin.random.Random
 
 val helpTexts = "help_texts.properties".asProperties
 
@@ -30,7 +31,7 @@ class Main : CliktCommand() {
         .optional()
 
     init {
-        eagerOption("--random", "-r", help = helpTexts["random"] ) {
+        eagerOption("--random", "-r", help = helpTexts["random"]) {
 
         }
     }
@@ -56,12 +57,24 @@ private fun String.toClipboard() {
     }
 }
 
-fun generateRandomPassword(): String =
-    arrayOf('a')
-        .toString()
+fun choices(charArray: CharArray, k: Int = 1) =
+    (0 until k)
+        .map { charArray.random() }
+        .toCharArray()
+
+fun generateRandomPassword(): String{
+    charArrayOf().apply {
+        plus(choices(charArrayOf('$', '#', '!', '@', '%', '^'), Random.nextInt(3, 6)))
+        plus(choices((0 until 10).map { (it + '0'.code).toChar() }.toCharArray(), Random.nextInt(3, 6)))
+        plus(choices(charArrayOf('$', '#', '!', '@', '%', '^'), Random.nextInt(3, 6)))
+    }
+
+    return ""
+}
 
 fun main(args: Array<String>) {
-    println(charArrayOf('a','b').concatToString())
+    println((2 + '0'.code).toChar())
+    println(charArrayOf('a', 'b').concatToString())
 //    val args = arrayOf("paypal")
 //    val argsParsed = Main().apply { main(args) }
 //    val acc = Account("PayPal", "shehab.ellithy@gmail.com", "Random1")
