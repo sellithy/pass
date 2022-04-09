@@ -20,21 +20,27 @@ typealias passwordsFile = Map<String, String>
 val prettyJson = Json { prettyPrint = true }
 
 
-class Main : CliktCommand() {
-    private val accountsFilePath: File by option(envvar = "ACC_FILE_PATH", help = helpTexts["accountsFilePath"])
-        .file().required()
-
-    private val passwordsFilePath: File by option(envvar = "PASS_FILE_PATH", help = helpTexts["passwordsFilePath"])
-        .file().required()
-
-    private val accountName: String? by argument(help = helpTexts["accountName"])
-        .optional()
+class Pass : CliktCommand() {
 
     init {
         eagerOption("--random", "-r", help = helpTexts["random"]) {
-
+            generateRandomPassword().toClipboard()
+            throw PrintMessage("Random password copied to clipboard")
         }
     }
+
+    private val accountsFilePath: File by option(
+        envvar = "ACC_FILE_PATH", help = helpTexts["accountsFilePath"]
+    ).file().required()
+
+    private val passwordsFilePath: File by option(
+        envvar = "PASS_FILE_PATH", help = helpTexts["passwordsFilePath"]
+    ).file().required()
+
+    private val accountName: String? by argument(
+        help = helpTexts["accountName"]
+    ).optional()
+
 
     override fun run() {
         val accounts = TreeMap<String, AccountInfo>(String.CASE_INSENSITIVE_ORDER).apply {
@@ -42,7 +48,7 @@ class Main : CliktCommand() {
         }
         val passwords = prettyJson.decodeFromStream<passwordsFile>(passwordsFilePath.inputStream())
         passwords[accounts[accountName]!!.passwordAlias]!!.toClipboard()
-        throw PrintMessage("copied")
+        throw PrintMessage("Password copied to clipboard")
     }
 }
 
@@ -50,33 +56,25 @@ private fun String.toClipboard() {
     trim().replace("'", "'\"'\"'").let {
         ProcessBuilder.startPipeline(
             listOf(
-                ProcessBuilder("echo -n $it".split(" ")),
-                ProcessBuilder("clip.exe")
+                ProcessBuilder("echo -n $it".split(" ")), ProcessBuilder("clip.exe")
             )
         )
     }
 }
 
-fun choices(charArray: CharArray, k: Int = 1) =
-    (0 until k)
-        .map { charArray.random() }
-        .toCharArray()
+fun generateRandomPassword() = mutableListOf<Char>().run {
+    val strangeChars = listOf('$', '#', '!', '@', '%', '^')
+    val numbers = (0..9).map { it.digitChar }
+    val asciiLetters = ('a'..'z').toList() + ('A'..'Z').toList()
 
-fun generateRandomPassword(): String{
-    charArrayOf().apply {
-        plus(choices(charArrayOf('$', '#', '!', '@', '%', '^'), Random.nextInt(3, 6)))
-        plus(choices((0 until 10).map { (it + '0'.code).toChar() }.toCharArray(), Random.nextInt(3, 6)))
-        plus(choices(charArrayOf('$', '#', '!', '@', '%', '^'), Random.nextInt(3, 6)))
-    }
-
-    return ""
+    plusAssign(choices(strangeChars, Random.nextInt(from = 3, until = 5)))
+    plusAssign(choices(numbers, Random.nextInt(from = 2, until = 4)))
+    plusAssign(choices(asciiLetters, 16 - size))
+    shuffle()
+    toCharArray().concatToString()
 }
 
 fun main(args: Array<String>) {
-    println((2 + '0'.code).toChar())
-    println(charArrayOf('a', 'b').concatToString())
 //    val args = arrayOf("paypal")
-//    val argsParsed = Main().apply { main(args) }
-//    val acc = Account("PayPal", "shehab.ellithy@gmail.com", "Random1")
-//    println(Json.decodeFromString<Account>("\"C&C: sellithy Random24\""))
+     Pass().apply { main(args) }
 }
