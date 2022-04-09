@@ -1,3 +1,5 @@
+val randomAliasPattern = "Random([0-9]+)".toRegex()
+
 fun <T> choices(list: List<T>, k: Int = 1) =
     (0 until k).map { list.random() }
 
