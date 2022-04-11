@@ -1,23 +1,16 @@
+import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.options.eagerOption
-import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.encodeToStream
 import java.io.File
-import java.util.*
 import kotlin.random.Random
 
 val helpTexts = "help_texts.properties".asProperties
-
-typealias accountsFile = Map<String, AccountInfo>
-typealias passwordsFile = MutableMap<String, String>
-
 val prettyJson = Json { prettyPrint = true }
 
 
@@ -50,18 +43,25 @@ class Pass : CliktCommand() {
         "--add", "-a", help = helpTexts["shouldAddAccount"]
     ).flag()
 
-    lateinit var accounts: TreeMap<String, AccountInfo>
-    lateinit var passwords: passwordsFile
+    private val change: Pair<String, String>? by option(
+        "--change", "-c", help = helpTexts["change"], metavar = "ss"
+    ).pair().transformValues(2) {(a, b) -> a to b}
+
+    private lateinit var accounts: LinkedHashMap<String, AccountInfo>
+    private lateinit var passwords: LinkedHashMap<String, String>
 
     override fun run() {
-        accounts = TreeMap<String, AccountInfo>(String.CASE_INSENSITIVE_ORDER).apply {
-            putAll(prettyJson.decodeFromStream<accountsFile>(accountsFilePath.inputStream()))
-        }
+        accounts = prettyJson.decodeFromStream(accountsFilePath.inputStream())
         passwords = prettyJson.decodeFromStream(passwordsFilePath.inputStream())
 
-        val accountInfo = accounts[accountName]
+        val accountInfo = accounts.firstNotNullOfOrNull { (accName, acc) ->
+            if (accName.lowercase() == accountName.lowercase()) acc else null
+        }
         if (accountInfo == null) {
-            if (shouldAddAccount) addNewAccount()
+            if (shouldAddAccount) {
+                addNewAccount().copyToClipboard()
+                throw PrintMessage("New Password copied to clipboard")
+            }
             throw PrintMessage("Account does not exist", true)
         }
 
@@ -81,18 +81,24 @@ class Pass : CliktCommand() {
         throw PrintMessage("Password copied to clipboard")
     }
 
-    private fun addNewAccount() {
-        val lastNum = accounts.values.mapNotNull { randomAliasPattern.matchEntire(it.passwordAlias) }
-            .map { it.groupValues[1].toInt() }.maxOf { it }
+    private fun addNewAccount(): String {
+        val lastNum = accounts.values
+            .mapNotNull { randomAliasPattern.matchEntire(it.passwordAlias) }
+            .map { it.groupValues[1].toInt() }
+            .maxOf { it }
 
         val newPassAlias = "Random${lastNum + 1}"
+        val newPass = generateRandomPassword()
         accounts[accountName] = AccountInfo(passwordAlias = newPassAlias)
-        passwords[newPassAlias] = generateRandomPassword()
+        passwords[newPassAlias] = newPass
 
+        encodeAccountsAndPasswords()
+        return newPass
+    }
+
+    private fun encodeAccountsAndPasswords() {
         prettyJson.encodeToStream(accounts, accountsFilePath.outputStream())
         prettyJson.encodeToStream(passwords, passwordsFilePath.outputStream())
-
-        throw PrintMessage("New Password copied to clipboard")
     }
 }
 
