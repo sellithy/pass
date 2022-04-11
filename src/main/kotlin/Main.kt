@@ -1,8 +1,12 @@
-import com.github.ajalt.clikt.completion.CompletionCandidates
+import com.github.ajalt.clikt.completion.completionOption
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.parameters.options.eagerOption
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.file
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -17,6 +21,7 @@ val prettyJson = Json { prettyPrint = true }
 class Pass : CliktCommand() {
 
     init {
+        completionOption()
         eagerOption("--random", "-r", help = helpTexts["random"]) {
             generateRandomPassword().copyToClipboard()
             throw PrintMessage("Random password copied to clipboard")
@@ -43,9 +48,9 @@ class Pass : CliktCommand() {
         "--add", "-a", help = helpTexts["shouldAddAccount"]
     ).flag()
 
-    private val change: Pair<String, String>? by option(
-        "--change", "-c", help = helpTexts["change"], metavar = "ss"
-    ).pair().transformValues(2) {(a, b) -> a to b}
+    private val change by option(
+        "--change", "-c", help = helpTexts["change"]
+    ).choice("Password", "Account")
 
     private lateinit var accounts: LinkedHashMap<String, AccountInfo>
     private lateinit var passwords: LinkedHashMap<String, String>
@@ -63,6 +68,10 @@ class Pass : CliktCommand() {
                 throw PrintMessage("New Password copied to clipboard")
             }
             throw PrintMessage("Account does not exist", true)
+        }
+
+        if(change != null){
+            println(change)
         }
 
         if (shouldGetUsername) {
@@ -126,5 +135,5 @@ fun generateRandomPassword() = mutableListOf<Char>().run {
 
 fun main(args: Array<String>) {
 //    val args = arrayOf("paypal")
-    Pass().apply { main(args) }
+    Pass().main(args)
 }
