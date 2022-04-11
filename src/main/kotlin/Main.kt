@@ -1,12 +1,9 @@
+import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.completion.completionOption
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.options.eagerOption
-import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.required
-import com.github.ajalt.clikt.parameters.types.choice
+import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -49,8 +46,9 @@ class Pass : CliktCommand() {
     ).flag()
 
     private val change by option(
-        "--change", "-c", help = helpTexts["change"]
-    ).choice("Password", "Account")
+        "--change", "-c", help = helpTexts["change"],
+        completionCandidates = CompletionCandidates.Fixed("pass=random", "pass=prompt", "acc=")
+    ).splitPair().check { (accOrPass, _) -> accOrPass in arrayOf("password", "account") }
 
     private lateinit var accounts: LinkedHashMap<String, AccountInfo>
     private lateinit var passwords: LinkedHashMap<String, String>
@@ -70,8 +68,18 @@ class Pass : CliktCommand() {
             throw PrintMessage("Account does not exist", true)
         }
 
-        if(change != null){
-            println(change)
+        if (change != null) {
+            val (accOrPass, _) = change!!
+            if (accOrPass == "password") {
+                val newPass = prompt(text = "New password", hideInput = true, requireConfirmation = true)
+                    ?: throw PrintMessage("Password did not change")
+
+                passwords[accountInfo.passwordAlias] = newPass.ifBlank { generateRandomPassword() }
+
+            }
+
+            encodeAccountsAndPasswords()
+            throw PrintMessage("$change changed successfully")
         }
 
         if (shouldGetUsername) {
@@ -91,10 +99,8 @@ class Pass : CliktCommand() {
     }
 
     private fun addNewAccount(): String {
-        val lastNum = accounts.values
-            .mapNotNull { randomAliasPattern.matchEntire(it.passwordAlias) }
-            .map { it.groupValues[1].toInt() }
-            .maxOf { it }
+        val lastNum = accounts.values.mapNotNull { randomAliasPattern.matchEntire(it.passwordAlias) }
+            .map { it.groupValues[1].toInt() }.maxOf { it }
 
         val newPassAlias = "Random${lastNum + 1}"
         val newPass = generateRandomPassword()
