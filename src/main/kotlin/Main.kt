@@ -45,10 +45,22 @@ class Pass : CliktCommand() {
         "--add", "-a", help = helpTexts["shouldAddAccount"]
     ).flag()
 
-    private val change by option(
+    private sealed class ChangeOptions {
+        object RandomPass : ChangeOptions()
+        object PromptPass : ChangeOptions()
+        class ACCOUNT(val value: String) : ChangeOptions()
+    }
+    private val change: ChangeOptions? by option(
         "--change", "-c", help = helpTexts["change"],
         completionCandidates = CompletionCandidates.Fixed("pass=random", "pass=prompt", "acc=")
-    ).splitPair().check { (accOrPass, _) -> accOrPass in arrayOf("password", "account") }
+    ).splitPair().convert { (accOrPass, value) ->
+        if (accOrPass == "pass")
+            if (value == "random") ChangeOptions.RandomPass else ChangeOptions.PromptPass
+        else if (accOrPass == "acc")
+            ChangeOptions.ACCOUNT(value)
+        else
+            fail("Change is not correctly formatted")
+    }
 
     private lateinit var accounts: LinkedHashMap<String, AccountInfo>
     private lateinit var passwords: LinkedHashMap<String, String>
@@ -69,17 +81,14 @@ class Pass : CliktCommand() {
         }
 
         if (change != null) {
-            val (accOrPass, _) = change!!
-            if (accOrPass == "password") {
-                val newPass = prompt(text = "New password", hideInput = true, requireConfirmation = true)
-                    ?: throw PrintMessage("Password did not change")
-
-                passwords[accountInfo.passwordAlias] = newPass.ifBlank { generateRandomPassword() }
-
+            when (val v = change!!) {
+                is ChangeOptions.ACCOUNT -> accounts[accountName] = accountInfo.copy(username = v.value)
+                ChangeOptions.PromptPass -> passwords[accountInfo.passwordAlias] =
+                    prompt(text = "New password", hideInput = true, requireConfirmation = true)!!
+                ChangeOptions.RandomPass -> passwords[accountInfo.passwordAlias] = generateRandomPassword()
             }
-
             encodeAccountsAndPasswords()
-            throw PrintMessage("$change changed successfully")
+            throw PrintMessage("changed successfully")
         }
 
         if (shouldGetUsername) {
