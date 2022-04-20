@@ -1,7 +1,7 @@
 import java.util.*
 
 class GoodProperties : Properties() {
-    operator fun get(key: String) = super.getProperty(key) ?: ""
+    operator fun get(key: String) = super.getProperty(key) ?: throw IllegalArgumentException("No property $key")
 }
 
 val String.asProperties: GoodProperties
