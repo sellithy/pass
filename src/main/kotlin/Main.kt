@@ -1,10 +1,10 @@
 import com.github.ajalt.clikt.completion.CompletionCandidates
-import com.github.ajalt.clikt.completion.completionOption
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.encodeToStream
@@ -14,11 +14,10 @@ import kotlin.random.Random
 val helpTexts = "help_texts.properties".asProperties
 val prettyJson = Json { prettyPrint = true }
 
-
+@OptIn(ExperimentalSerializationApi::class)
 class Pass : CliktCommand() {
 
     init {
-        completionOption()
         eagerOption("--random", "-r", help = helpTexts["random"]) {
             generateRandomPassword().copyToClipboard()
             throw PrintMessage("Random password copied to clipboard")
@@ -36,7 +35,7 @@ class Pass : CliktCommand() {
     private val copyCommand: String by option(
         envvar = "COPY_COMMAND", help = helpTexts["copyCommand"]
     ).required()
-    
+
     private val accountName: String by argument(
         help = helpTexts["accountName"]
     )
@@ -54,6 +53,7 @@ class Pass : CliktCommand() {
         object PromptPass : ChangeOptions()
         class ACCOUNT(val value: String) : ChangeOptions()
     }
+
     private val change: ChangeOptions? by option(
         "--change", "-c", help = helpTexts["change"],
         completionCandidates = CompletionCandidates.Fixed("pass=random", "pass=prompt", "acc=")
@@ -70,8 +70,7 @@ class Pass : CliktCommand() {
     private lateinit var passwords: LinkedHashMap<String, String>
 
     override fun run() {
-        accounts = prettyJson.decodeFromStream(accountsFilePath.inputStream())
-        passwords = prettyJson.decodeFromStream(passwordsFilePath.inputStream())
+        decodeAccountsAndPasswords()
 
         val accountInfo = accounts.firstNotNullOfOrNull { (accName, acc) ->
             if (accName.lowercase() == accountName.lowercase()) acc else null
@@ -89,6 +88,7 @@ class Pass : CliktCommand() {
                 is ChangeOptions.ACCOUNT -> accounts[accountName] = accountInfo.copy(username = v.value)
                 ChangeOptions.PromptPass -> passwords[accountInfo.passwordAlias] =
                     prompt(text = "New password", hideInput = true, requireConfirmation = true)!!
+
                 ChangeOptions.RandomPass -> passwords[accountInfo.passwordAlias] = generateRandomPassword()
             }
             encodeAccountsAndPasswords()
@@ -129,7 +129,12 @@ class Pass : CliktCommand() {
         prettyJson.encodeToStream(passwords, passwordsFilePath.outputStream())
     }
 
-    fun String.copyToClipboard() {
+    private fun decodeAccountsAndPasswords() {
+        accounts = prettyJson.decodeFromStream(accountsFilePath.inputStream())
+        passwords = prettyJson.decodeFromStream(passwordsFilePath.inputStream())
+    }
+
+    private fun String.copyToClipboard() {
         trim().replace("'", "'\"'\"'").let {
             ProcessBuilder.startPipeline(
                 listOf(
@@ -140,19 +145,5 @@ class Pass : CliktCommand() {
     }
 }
 
-fun generateRandomPassword() = mutableListOf<Char>().run {
-    val strangeChars = listOf('$', '#', '!', '@', '%', '^')
-    val numbers = (0..9).map { it.digitChar }
-    val asciiLetters = ('a'..'z').toList() + ('A'..'Z').toList()
-
-    plusAssign(choices(strangeChars, Random.nextInt(from = 3, until = 6)))
-    plusAssign(choices(numbers, Random.nextInt(from = 2, until = 5)))
-    plusAssign(choices(asciiLetters, 16 - size))
-    shuffle()
-    toCharArray().concatToString()
-}
-
-fun main(args: Array<String>) {
-//    val args = arrayOf("paypal")
+fun main(args: Array<String>) =
     Pass().main(args)
-}
