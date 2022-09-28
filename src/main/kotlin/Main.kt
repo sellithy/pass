@@ -33,6 +33,10 @@ class Pass : CliktCommand() {
         envvar = "PASS_FILE_PATH", help = helpTexts["passwordsFilePath"]
     ).file().required()
 
+    private val copyCommand: String by option(
+        envvar = "COPY_COMMAND", help = helpTexts["copyCommand"]
+    ).required()
+    
     private val accountName: String by argument(
         help = helpTexts["accountName"]
     )
@@ -124,15 +128,15 @@ class Pass : CliktCommand() {
         prettyJson.encodeToStream(accounts, accountsFilePath.outputStream())
         prettyJson.encodeToStream(passwords, passwordsFilePath.outputStream())
     }
-}
 
-fun String.copyToClipboard() {
-    trim().replace("'", "'\"'\"'").let {
-        ProcessBuilder.startPipeline(
-            listOf(
-                ProcessBuilder("echo -n $it".split(" ")), ProcessBuilder("clip.exe")
+    fun String.copyToClipboard() {
+        trim().replace("'", "'\"'\"'").let {
+            ProcessBuilder.startPipeline(
+                listOf(
+                    ProcessBuilder("echo -n $it".split(" ")), ProcessBuilder(copyCommand)
+                )
             )
-        )
+        }
     }
 }
 
