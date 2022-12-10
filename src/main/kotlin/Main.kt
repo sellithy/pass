@@ -1,7 +1,9 @@
 import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.PrintMessage
+import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -17,13 +19,6 @@ val prettyJson = Json { prettyPrint = true }
 @OptIn(ExperimentalSerializationApi::class)
 class Pass : CliktCommand() {
 
-    init {
-        eagerOption("--random", "-r", help = helpTexts["random"]) {
-            generateRandomPassword().copyToClipboard()
-            throw PrintMessage("Random password copied to clipboard")
-        }
-    }
-
     private val accountsFilePath: File by option(
         envvar = "ACC_FILE_PATH", help = helpTexts["accountsFilePath"]
     ).file().required()
@@ -36,9 +31,13 @@ class Pass : CliktCommand() {
         envvar = "COPY_COMMAND", help = helpTexts["copyCommand"]
     ).required()
 
-    private val accountName: String by argument(
+    private val accountName: String? by argument(
         help = helpTexts["accountName"]
-    )
+    ).optional()
+
+    private val shouldGenerateRandom: Boolean by option(
+        "--random", "-r", help = helpTexts["random"]
+    ).flag()
 
     private val shouldGetUsername: Boolean by option(
         "--username", "-u", help = helpTexts["shouldGetUsername"]
@@ -70,10 +69,18 @@ class Pass : CliktCommand() {
     private lateinit var passwords: LinkedHashMap<String, String>
 
     override fun run() {
+        if(shouldGenerateRandom) {
+            generateRandomPassword().copyToClipboard()
+            throw PrintMessage("Random password copied to clipboard")
+        }
+
+        if(accountName == null)
+            throw UsageError("Missing argument \"ACCOUNTNAME\"")
+
         decodeAccountsAndPasswords()
 
         val accountInfo = accounts.firstNotNullOfOrNull { (accName, acc) ->
-            if (accName.lowercase() == accountName.lowercase()) acc else null
+            if (accName.lowercase() == accountName!!.lowercase()) acc else null
         }
         if (accountInfo == null) {
             if (shouldAddAccount) {
@@ -85,7 +92,7 @@ class Pass : CliktCommand() {
 
         if (change != null) {
             when (val v = change!!) {
-                is ChangeOptions.ACCOUNT -> accounts[accountName] = accountInfo.copy(username = v.value)
+                is ChangeOptions.ACCOUNT -> accounts[accountName!!] = accountInfo.copy(username = v.value)
                 ChangeOptions.PromptPass -> passwords[accountInfo.passwordAlias] =
                     prompt(text = "New password", hideInput = true, requireConfirmation = true)!!
 
@@ -117,7 +124,7 @@ class Pass : CliktCommand() {
 
         val newPassAlias = "Random${lastNum + 1}"
         val newPass = generateRandomPassword()
-        accounts[accountName] = AccountInfo(passwordAlias = newPassAlias)
+        accounts[accountName!!] = AccountInfo(passwordAlias = newPassAlias)
         passwords[newPassAlias] = newPass
 
         encodeAccountsAndPasswords()
